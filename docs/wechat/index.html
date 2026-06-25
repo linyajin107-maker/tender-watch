@@ -112,9 +112,31 @@
         </article>
       `).join("");
     }
+    async function loadItems() {
+      const urls = [
+        "../tender_seed_results.json",
+        "/tender-watch/tender_seed_results.json",
+        "tender_seed_results.json"
+      ];
+      for (const url of urls) {
+        try {
+          const response = await fetch(`${url}?v=20260625`, { cache: "no-store" });
+          if (response.ok) return response.json();
+        } catch (error) {
+          // Try the next path.
+        }
+      }
+      throw new Error("No data file found");
+    }
 
-    fetch("../tender_seed_results.json")
-      .then((response) => response.json())
+    loadItems()
+      .then((items) => {
+        allItems = items;
+        render();
+      })
+      .catch(() => {
+        resultsEl.textContent = "线索数据加载失败，请稍后刷新。";
+      });
       .then((items) => {
         allItems = items;
         render();
