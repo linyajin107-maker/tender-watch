@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>合理用药招标线索</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #eef2f6; color: #17202a; }
+    main { max-width: 900px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    p { margin: 6px 0; line-height: 1.65; }
+    .hint { color: #667887; font-size: 14px; }
+    .panel { background: #fff; border: 1px solid #d8e0e7; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+    .filters { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+    input, select { width: 100%; min-height: 42px; border: 1px solid #bdc8d2; border-radius: 6px; padding: 0 10px; font-size: 15px; background: #fff; }
+    .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .tag { display: inline-flex; min-height: 26px; align-items: center; padding: 0 8px; border-radius: 999px; background: #e9f2f8; color: #145f8f; font-size: 12px; font-weight: 700; }
+    .result { background: #fff; border: 1px solid #dce4eb; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+    .result h2 { font-size: 17px; line-height: 1.45; margin: 0 0 8px; }
+    .meta { display: flex; gap: 7px; flex-wrap: wrap; color: #607382; font-size: 13px; margin-bottom: 8px; }
+    .snippet { color: #34495a; font-size: 14px; }
+    .open { display: inline-flex; min-height: 34px; align-items: center; margin-top: 10px; padding: 0 12px; border-radius: 6px; background: #1769aa; color: #fff; text-decoration: none; font-weight: 700; }
+    .empty { background: #fff; border: 1px dashed #c7d2dd; border-radius: 8px; padding: 24px; text-align: center; color: #667887; }
+    @media (max-width: 560px) {
+      main { padding: 12px; }
+      .filters { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <h1>合理用药招标线索</h1>
+      <p class="hint">默认展示最近一个月四川医院、合理用药、审方、云药房、药学监护相关线索。</p>
+      <div class="filters">
+        <input id="keyword" value="合理用药 审方 云药房 药学监护 智慧医院" />
+        <select id="region">
+          <option value="">全四川</option>
+          <option>成都</option>
+          <option>内江</option>
+          <option>德阳</option>
+          <option>富顺</option>
+          <option>自贡</option>
+        </select>
+      </div>
+      <div class="stats">
+        <span class="tag" id="countTag">0 条线索</span>
+        <span class="tag">最近一个月</span>
+      </div>
+    </section>
+    <div id="results" class="empty">正在加载线索...</div>
+  </main>
+
+  <script>
+    const keywordEl = document.getElementById("keyword");
+    const regionEl = document.getElementById("region");
+    const resultsEl = document.getElementById("results");
+    const countTag = document.getElementById("countTag");
+    let allItems = [];
+
+    function compact(text) {
+      return String(text || "").replace(/\s+/g, "").toLowerCase();
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[char]));
+    }
+
+    function withinMonth(item) {
+      if (!item.date) return true;
+      const itemDate = new Date(item.date + "T00:00:00");
+      const now = new Date();
+      const start = new Date(now);
+      start.setDate(start.getDate() - 30);
+      return itemDate >= start && itemDate <= now;
+    }
+
+    function matches(item) {
+      const region = regionEl.value;
+      const haystack = compact([item.title, item.snippet, item.region, item.source].join(" "));
+      if (region && !haystack.includes(compact(region))) return false;
+      const tokens = keywordEl.value.split(/\s+/).filter(Boolean);
+      return tokens.length === 0 || tokens.some((token) => haystack.includes(compact(token)));
+    }
+
+    function render() {
+      const items = allItems
+        .filter(withinMonth)
+        .filter(matches)
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+      countTag.textContent = `${items.length} 条线索`;
+      if (!items.length) {
+        resultsEl.className = "empty";
+        resultsEl.textContent = "没有匹配线索。";
+        return;
+      }
+      resultsEl.className = "";
+      resultsEl.innerHTML = items.map((item) => `
+        <article class="result">
+          <h2>${escapeHtml(item.title)}</h2>
+          <div class="meta">
+            <span>${escapeHtml(item.date)}</span>
+            <span>${escapeHtml(item.region)}</span>
+            <span>${escapeHtml(item.stage)}</span>
+            <span>${escapeHtml(item.source)}</span>
+          </div>
+          <p class="snippet">${escapeHtml(item.snippet)}</p>
+          <a class="open" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">查找原文</a>
+        </article>
+      `).join("");
+    }
+
+    fetch("tender_seed_results.json")
+      .then((response) => response.json())
+      .then((items) => {
+        allItems = items;
+        render();
+      })
+      .catch(() => {
+        resultsEl.textContent = "线索数据加载失败。";
+      });
+
+    keywordEl.addEventListener("input", render);
+    regionEl.addEventListener("change", render);
+  </script>
+</body>
+</html>
