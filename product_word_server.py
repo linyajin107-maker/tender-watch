@@ -209,6 +209,8 @@ SCHEMES = {
 
 
 def load_corpus():
+    if not CORPUS_PATH.exists():
+        return []
     with CORPUS_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
 
